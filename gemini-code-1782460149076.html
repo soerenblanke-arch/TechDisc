@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TechDisc MG24 Dashboard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #121214;
+            color: #e2e8f0;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            color: #f7fafc;
+            margin-bottom: 5px;
+        }
+        .status-container {
+            margin-bottom: 25px;
+            font-size: 0.95rem;
+            color: #a0aec0;
+        }
+        .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background-color: #e53e3e;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .status-dot.connected {
+            background-color: #38a169;
+        }
+        button {
+            background-color: #3182ce;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-bottom: 30px;
+            width: 100%;
+            max-width: 300px;
+        }
+        button:hover {
+            background-color: #2b6cb0;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px;
+            width: 100%;
+            max-width: 600px;
+        }
+        .card {
+            background-color: #1a202c;
+            border: 1px solid #2d3748;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .card h2 {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #718096;
+            margin: 0 0 10px 0;
+        }
+        .value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #edf2f7;
+        }
+        .unit {
+            font-size: 0.85rem;
+            color: #718096;
+            margin-top: 2px;
+        }
+        #rawHex {
+            margin-top: 30px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            color: #4a5568;
+            word-break: break-all;
+            max-width: 600px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>TechDisc MG24</h1>
+    
+    <div class="status-container">
+        <span id="statusDot" class="status-dot"></span>
+        <span id="statusText">Afbrudt</span>
+    </div>
+
+    <button id="connectBtn">Forbind til Disc</button>
+
+    <div class="grid">
+        <div class="card">
+            <h2>Hastighed</h2>
+            <div id="speed" class="value">0.0</div>
+            <div class="unit">m/s</div>
+        </div>
+        <div class="card">
+            <h2>Spin</h2>
+            <div id="spin" class="value">0</div>
+            <div class="unit">rpm</div>
+        </div>
+        <div class="card">
+            <h2>Wobble</h2>
+            <div id="wobble" class="value">0.0</div>
+            <div class="unit">Nm</div>
+        </div>
+        <div class="card">
+            <h2>Hyzer</h2>
+            <div id="hyzer" class="value">0.0</div>
+            <div class="unit">grader</div>
+        </div>
+        <div class="card">
+            <h2>Nose</h2>
+            <div id="nose" class="value">0.0</div>
+            <div class="unit">grader</div>
+        </div>
+        <div class="card">
+            <h2>Launch</h2>
+            <div id="launch" class="value">0.0</div>
+            <div class="unit">grader</div>
+        </div>
+    </div>
+
+    <div id="rawHex">Hex: Ingen data modtaget endnu</div>
+
+    <script>
+        const SERVICE_UUID = '44697363-5465-6c65-6d65-747279303030'.toLowerCase();
+        const CHARACTERISTIC_UUID = '44697363-5465-6c65-6d65-747279303031'.toLowerCase();
+
+        const connectBtn = document.getElementById('connectBtn');
+        const statusText = document.getElementById('statusText');
+        const statusDot = document.getElementById('statusDot');
+        const rawHexDiv = document.getElementById('rawHex');
+
+        connectBtn.addEventListener('click', async () => {
+            try {
+                statusText.innerText = "Scanner...";
+                
+                const device = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: [SERVICE_UUID]
+                });
+
+                statusText.innerText = "Forbinder til gatt...";
+                const server = await device.gatt.connect();
+                
+                statusText.innerText = "Henter tilgængelige services...";
+                const services = await server.getPrimaryServices();
+                console.log("Fundne services på chippen:", services);
+                
+                let targetService = null;
+                for (let s of services) {
+                    if (s.uuid.replace(/-/g, '') === SERVICE_UUID.replace(/-/g, '')) {
+                        targetService = s;
+                        break;
+                    }
+                }
+                
+                if (!targetService && services.length > 0) {
+                    const customServices = services.filter(s => !s.uuid.startsWith('0000'));
+                    if (customServices.length > 0) {
+                        targetService = customServices[0];
+                        console.log("Bruger backup-service UUID:", targetService.uuid);
+                    }
+                }
+
+                if (!targetService) {
+                    throw new Error("Ingen brugbare services fundet på chippen. Tjek din Arduino-kode.");
+                }
+
+                const characteristics = await targetService.getCharacteristics();
+                let targetCharacteristic = characteristics[0];
+
+                statusText.innerText = "Forbundet";
+                statusDot.classList.add('connected');
+                connectBtn.style.display = 'none';
+
+                await targetCharacteristic.startNotifications();
+                targetCharacteristic.addEventListener('characteristicvaluechanged', handleData);
+
+            } catch (error) {
+                console.error(error);
+                statusText.innerText = "Fejl: " + error.message;
+                statusDot.classList.remove('connected');
+            }
+        });
+
+        function handleData(event) {
+            const dataView = event.target.value;
+            if (dataView.byteLength < 24) return;
+
+            const speed = dataView.getFloat32(0, true);
+            const spin = dataView.getFloat32(4, true);
+            const wobble = dataView.getFloat32(8, true);
+            const hyzer = dataView.getFloat32(12, true);
+            const nose = dataView.getFloat32(16, true);
+            const launch = dataView.getFloat32(20, true);
+
+            document.getElementById('speed').innerText = speed.toFixed(1);
+            document.getElementById('spin').innerText = Math.round(spin);
+            document.getElementById('wobble').innerText = wobble.toFixed(2);
+            document.getElementById('hyzer').innerText = hyzer.toFixed(1);
+            document.getElementById('nose').innerText = nose.toFixed(1);
+            document.getElementById('launch').innerText = launch.toFixed(1);
+
+            let hexString = 'Hex: ';
+            for (let i = 0; i < dataView.byteLength; i++) {
+                let byte = dataView.getUint8(i).toString(16).toUpperCase();
+                hexString += (byte.length === 1 ? '0' : '') + byte + ' ';
+            }
+            rawHexDiv.innerText = hexString;
+        }
+    </script>
+</body>
+</html>
