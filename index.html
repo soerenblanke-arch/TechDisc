@@ -571,21 +571,43 @@
     }
 
     function parsePacket(dataView) {
-      if (dataView.byteLength !== 26) {
-        throw new Error(`Invalid packet length: ${dataView.byteLength}`);
-      }
-
-      return {
-        speed: dataView.getFloat32(0, true),
-        spin: dataView.getFloat32(4, true),
-        wobble: dataView.getFloat32(8, true),
-        hyzer: dataView.getFloat32(12, true),
-        nose: dataView.getFloat32(16, true),
-        launch: dataView.getFloat32(20, true),
-        battery: dataView.getUint8(24),
-        state: dataView.getUint8(25)
-      };
+    if (dataView.byteLength !== 38) {
+      throw new Error(`Invalid packet length: ${dataView.byteLength}`);
     }
+
+    return {
+      speed: dataView.getFloat32(0, true),
+      spin: dataView.getFloat32(4, true),
+      wobble: dataView.getFloat32(8, true),
+      hyzer: dataView.getFloat32(12, true),
+      nose: dataView.getFloat32(16, true),
+      launch: dataView.getFloat32(20, true),
+      battery: dataView.getUint8(24),
+      state: dataView.getUint8(25),
+      gx: dataView.getFloat32(26, true),
+      gy: dataView.getFloat32(30, true),
+      gz: dataView.getFloat32(34, true)
+    };
+  }
+
+// --- Update updateLiveUi ---
+function updateLiveUi(t) {
+  // ... (existing UI updates)
+  elements.debugGyroX.textContent = `${t.gx.toFixed(1)} dps`;
+  elements.debugGyroY.textContent = `${t.gy.toFixed(1)} dps`;
+  elements.debugGyroZ.textContent = `${t.gz.toFixed(1)} dps`;
+  // Add accel if needed via similar mapping
+}
+
+// --- Update updateOrientationTarget ---
+function updateOrientationTarget(t) {
+  // Update rotation regardless of state
+  targetRotation.x = THREE.MathUtils.degToRad(t.nose);
+  targetRotation.z = THREE.MathUtils.degToRad(t.hyzer);
+  
+  // Visual yaw based on gyro Z
+  targetRotation.y += THREE.MathUtils.degToRad(t.gz / 60); 
+}
 
     function onTelemetry(event) {
       try {
