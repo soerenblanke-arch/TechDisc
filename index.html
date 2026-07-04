@@ -44,7 +44,7 @@
         </div>
         <div class="card">
             <h3>Flight Estimation</h3>
-            <p>Estimated Distance: <span id="val-dist" class="metric">0.0</span> ft</p>
+            <p>Estimated Distance: <span id="val-dist" class="metric">0.0</span> m</p>
             <p>Flight Duration: <span id="val-time" class="metric">0.0</span> s</p>
         </div>
     </div>
@@ -143,11 +143,11 @@
             warnTag.style.display = "none";
         }
 
-        // Live 3D Mapping (Applies continuously)
+        // Live 3D Mapping
         discMesh.rotation.z = THREE.MathUtils.degToRad(hyzer);
         discMesh.rotation.x = THREE.MathUtils.degToRad(nose);
 
-        // Throw Data Capture (Executes only when release flag is triggered by microcontroller)
+        // Throw Data Capture
         if (state_flag === 1) {
             document.getElementById('val-speed').innerText = speed.toFixed(1);
             document.getElementById('val-spin').innerText = spin.toFixed(0);
@@ -163,9 +163,8 @@
             
             const time_flight = (2 * v0_mps * Math.sin(theta_rad)) / g;
             const distance_m = (v0_mps * v0_mps * Math.sin(2 * theta_rad)) / g;
-            const distance_ft = distance_m * 3.28084;
 
-            document.getElementById('val-dist').innerText = distance_ft > 0 ? distance_ft.toFixed(1) : "0.0";
+            document.getElementById('val-dist').innerText = distance_m > 0 ? distance_m.toFixed(1) : "0.0";
             document.getElementById('val-time').innerText = time_flight > 0 ? time_flight.toFixed(2) : "0.0";
         }
     }
