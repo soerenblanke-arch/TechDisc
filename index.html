@@ -102,7 +102,7 @@
     async function connectBluetooth() {
         try {
             const device = await navigator.bluetooth.requestDevice({
-                filters: [{ namePrefix: 'TechDisc-V2' }],
+                acceptAllDevices: true,
                 optionalServices: [SERVICE_UUID]
             });
             const server = await device.gatt.connect();
