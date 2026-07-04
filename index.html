@@ -1,233 +1,174 @@
 <!DOCTYPE html>
-<html lang="da">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TechDisc MG24 Dashboard</title>
+    <title>TechDisc Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #121214;
-            color: #e2e8f0;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        h1 {
-            color: #f7fafc;
-            margin-bottom: 5px;
-        }
-        .status-container {
-            margin-bottom: 25px;
-            font-size: 0.95rem;
-            color: #a0aec0;
-        }
-        .status-dot {
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            background-color: #e53e3e;
-            border-radius: 50%;
-            margin-right: 5px;
-        }
-        .status-dot.connected {
-            background-color: #38a169;
-        }
-        button {
-            background-color: #3182ce;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            font-size: 1rem;
-            font-weight: 600;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            margin-bottom: 30px;
-            width: 100%;
-            max-width: 300px;
-        }
-        button:hover {
-            background-color: #2b6cb0;
-        }
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 15px;
-            width: 100%;
-            max-width: 600px;
-        }
-        .card {
-            background-color: #1a202c;
-            border: 1px solid #2d3748;
-            border-radius: 12px;
-            padding: 20px;
-            text-align: center;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
-        .card h2 {
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #718096;
-            margin: 0 0 10px 0;
-        }
-        .value {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: #edf2f7;
-        }
-        .unit {
-            font-size: 0.85rem;
-            color: #718096;
-            margin-top: 2px;
-        }
-        #rawHex {
-            margin-top: 30px;
-            font-family: monospace;
-            font-size: 0.8rem;
-            color: #4a5568;
-            word-break: break-all;
-            max-width: 600px;
-            text-align: center;
-        }
+        body { font-family: Arial, sans-serif; background-color: #121212; color: #ffffff; margin: 0; padding: 0; }
+        .nav { display: flex; background: #1e1e1e; padding: 10px; border-bottom: 2px solid #333; }
+        .nav button { background: #333; color: #fff; border: none; padding: 10px 20px; margin-right: 10px; cursor: pointer; border-radius: 4px; }
+        .nav button.active { background: #007bff; }
+        .container { padding: 20px; display: none; }
+        .active-tab { display: block; }
+        .card { background: #1e1e1e; padding: 20px; margin-bottom: 15px; border-radius: 8px; border: 1px solid #333; }
+        .metric { font-size: 24px; font-weight: bold; color: #007bff; }
+        #battery-warning { color: #ff4444; font-weight: bold; display: none; margin-left: auto; align-self: center; padding-right: 20px;}
+        #connect-btn { background: #28a745; margin-bottom: 20px; width: 100%; font-size: 18px; padding: 15px; }
+        #canvas-container { width: 100%; height: 60vh; background: #000; border-radius: 8px; overflow: hidden;}
     </style>
 </head>
 <body>
 
-    <h1>TechDisc MG24</h1>
-    
-    <div class="status-container">
-        <span id="statusDot" class="status-dot"></span>
-        <span id="statusText">Afbrudt</span>
+    <div class="nav">
+        <button id="tab-data" class="active" onclick="switchTab('data')">Flight Data</button>
+        <button id="tab-3d" onclick="switchTab('3d')">3D Live View</button>
+        <div id="battery-warning">⚠ LOW BATTERY</div>
     </div>
 
-    <button id="connectBtn">Forbind til Disc</button>
+    <div style="padding: 20px;">
+        <button id="connect-btn" onclick="connectBluetooth()">Connect to Disc</button>
+    </div>
 
-    <div class="grid">
+    <!-- Data Tab -->
+    <div id="data" class="container active-tab">
         <div class="card">
-            <h2>Hastighed</h2>
-            <div id="speed" class="value">0.0</div>
-            <div class="unit">m/s</div>
+            <h3>Release Metrics (Updates on Throw)</h3>
+            <p>Speed: <span id="val-speed" class="metric">0.0</span> mph</p>
+            <p>Spin: <span id="val-spin" class="metric">0.0</span> rpm</p>
+            <p>Wobble: <span id="val-wobble" class="metric">0.0</span> °</p>
+            <p>Hyzer Angle: <span id="val-hyzer" class="metric">0.0</span> °</p>
+            <p>Nose Angle: <span id="val-nose" class="metric">0.0</span> °</p>
+            <p>Launch Angle: <span id="val-launch" class="metric">0.0</span> °</p>
         </div>
         <div class="card">
-            <h2>Spin</h2>
-            <div id="spin" class="value">0</div>
-            <div class="unit">rpm</div>
-        </div>
-        <div class="card">
-            <h2>Wobble</h2>
-            <div id="wobble" class="value">0.0</div>
-            <div class="unit">Nm</div>
-        </div>
-        <div class="card">
-            <h2>Hyzer</h2>
-            <div id="hyzer" class="value">0.0</div>
-            <div class="unit">grader</div>
-        </div>
-        <div class="card">
-            <h2>Nose</h2>
-            <div id="nose" class="value">0.0</div>
-            <div class="unit">grader</div>
-        </div>
-        <div class="card">
-            <h2>Launch</h2>
-            <div id="launch" class="value">0.0</div>
-            <div class="unit">grader</div>
+            <h3>Flight Estimation</h3>
+            <p>Estimated Distance: <span id="val-dist" class="metric">0.0</span> ft</p>
+            <p>Flight Duration: <span id="val-time" class="metric">0.0</span> s</p>
         </div>
     </div>
 
-    <div id="rawHex">Hex: Ingen data modtaget endnu</div>
+    <!-- 3D Tab -->
+    <div id="3d" class="container">
+        <div class="card">
+            <h3>Live Disc Orientation</h3>
+            <div id="canvas-container"></div>
+        </div>
+    </div>
 
-    <script>
-        const SERVICE_UUID = '44697363-5465-6c65-6d65-747279303030'.toLowerCase();
-        const CHARACTERISTIC_UUID = '44697363-5465-6c65-6d65-747279303031'.toLowerCase();
+<script>
+    // Tab Logic
+    function switchTab(tabId) {
+        document.querySelectorAll('.container').forEach(c => c.classList.remove('active-tab'));
+        document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active-tab');
+        document.getElementById('tab-' + tabId).classList.add('active');
+    }
 
-        const connectBtn = document.getElementById('connectBtn');
-        const statusText = document.getElementById('statusText');
-        const statusDot = document.getElementById('statusDot');
-        const rawHexDiv = document.getElementById('rawHex');
+    // Three.js Setup
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    container.appendChild(renderer.domElement);
 
-        connectBtn.addEventListener('click', async () => {
-            try {
-                statusText.innerText = "Scanner...";
-                
-                const device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: [SERVICE_UUID]
-                });
+    const geometry = new THREE.CylinderGeometry(5, 5, 0.5, 32);
+    const material = new THREE.MeshBasicMaterial({ color: 0x007bff, wireframe: true });
+    const discMesh = new THREE.Mesh(geometry, material);
+    scene.add(discMesh);
+    camera.position.z = 10;
+    camera.position.y = 5;
+    camera.lookAt(0,0,0);
 
-                statusText.innerText = "Forbinder til gatt...";
-                const server = await device.gatt.connect();
-                
-                statusText.innerText = "Henter tilgængelige services...";
-                const services = await server.getPrimaryServices();
-                console.log("Fundne services på chippen:", services);
-                
-                let targetService = null;
-                for (let s of services) {
-                    if (s.uuid.replace(/-/g, '') === SERVICE_UUID.replace(/-/g, '')) {
-                        targetService = s;
-                        break;
-                    }
-                }
-                
-                if (!targetService && services.length > 0) {
-                    const customServices = services.filter(s => !s.uuid.startsWith('0000'));
-                    if (customServices.length > 0) {
-                        targetService = customServices[0];
-                        console.log("Bruger backup-service UUID:", targetService.uuid);
-                    }
-                }
+    function animate() {
+        requestAnimationFrame(animate);
+        renderer.render(scene, camera);
+    }
+    animate();
 
-                if (!targetService) {
-                    throw new Error("Ingen brugbare services fundet på chippen. Tjek din Arduino-kode.");
-                }
+    // Resize handler for 3D canvas
+    window.addEventListener('resize', () => {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+    });
 
-                const characteristics = await targetService.getCharacteristics();
-                let targetCharacteristic = characteristics[0];
+    // Bluetooth Logic
+    const SERVICE_UUID = "30303079-7274-656d-656c-655463736944";
+    const CHAR_UUID = "31303079-7274-656d-656c-655463736944";
 
-                statusText.innerText = "Forbundet";
-                statusDot.classList.add('connected');
-                connectBtn.style.display = 'none';
-
-                await targetCharacteristic.startNotifications();
-                targetCharacteristic.addEventListener('characteristicvaluechanged', handleData);
-
-            } catch (error) {
-                console.error(error);
-                statusText.innerText = "Fejl: " + error.message;
-                statusDot.classList.remove('connected');
-            }
-        });
-
-        function handleData(event) {
-            const dataView = event.target.value;
-            if (dataView.byteLength < 24) return;
-
-            const speed = dataView.getFloat32(0, true);
-            const spin = dataView.getFloat32(4, true);
-            const wobble = dataView.getFloat32(8, true);
-            const hyzer = dataView.getFloat32(12, true);
-            const nose = dataView.getFloat32(16, true);
-            const launch = dataView.getFloat32(20, true);
-
-            document.getElementById('speed').innerText = speed.toFixed(1);
-            document.getElementById('spin').innerText = Math.round(spin);
-            document.getElementById('wobble').innerText = wobble.toFixed(2);
-            document.getElementById('hyzer').innerText = hyzer.toFixed(1);
-            document.getElementById('nose').innerText = nose.toFixed(1);
-            document.getElementById('launch').innerText = launch.toFixed(1);
-
-            let hexString = 'Hex: ';
-            for (let i = 0; i < dataView.byteLength; i++) {
-                let byte = dataView.getUint8(i).toString(16).toUpperCase();
-                hexString += (byte.length === 1 ? '0' : '') + byte + ' ';
-            }
-            rawHexDiv.innerText = hexString;
+    async function connectBluetooth() {
+        try {
+            const device = await navigator.bluetooth.requestDevice({
+                filters: [{ namePrefix: 'TechDisc' }],
+                optionalServices: [SERVICE_UUID]
+            });
+            const server = await device.gatt.connect();
+            const service = await server.getPrimaryService(SERVICE_UUID);
+            const characteristic = await service.getCharacteristic(CHAR_UUID);
+            
+            characteristic.startNotifications();
+            characteristic.addEventListener('characteristicvaluechanged', handleData);
+            
+            document.getElementById('connect-btn').innerText = "Connected";
+            document.getElementById('connect-btn').style.background = "#0056b3";
+        } catch (error) {
+            console.error(error);
+            alert("Bluetooth Connection Failed.");
         }
-    </script>
+    }
+
+    function handleData(event) {
+        const value = event.target.value;
+        if (value.byteLength < 26) return;
+
+        // Parse Payload
+        const speed = value.getFloat32(0, true);
+        const spin = value.getFloat32(4, true);
+        const wobble = value.getFloat32(8, true);
+        const hyzer = value.getFloat32(12, true);
+        const nose = value.getFloat32(16, true);
+        const launch = value.getFloat32(20, true);
+        const battery = value.getUint8(24);
+        const state_flag = value.getUint8(25);
+
+        // Battery State Management
+        const warnTag = document.getElementById('battery-warning');
+        if (battery < 10) {
+            warnTag.style.display = "block";
+            warnTag.innerText = `⚠ LOW BATTERY (${battery}%)`;
+        } else {
+            warnTag.style.display = "none";
+        }
+
+        // Live 3D Mapping (Applies continuously)
+        discMesh.rotation.z = THREE.MathUtils.degToRad(hyzer);
+        discMesh.rotation.x = THREE.MathUtils.degToRad(nose);
+
+        // Throw Data Capture (Executes only when release flag is triggered by microcontroller)
+        if (state_flag === 1) {
+            document.getElementById('val-speed').innerText = speed.toFixed(1);
+            document.getElementById('val-spin').innerText = spin.toFixed(0);
+            document.getElementById('val-wobble').innerText = wobble.toFixed(1);
+            document.getElementById('val-hyzer').innerText = hyzer.toFixed(1);
+            document.getElementById('val-nose').innerText = nose.toFixed(1);
+            document.getElementById('val-launch').innerText = launch.toFixed(1);
+
+            // Flight Estimation (Kinematic Trajectory Approximation)
+            const v0_mps = speed * 0.44704; 
+            const theta_rad = THREE.MathUtils.degToRad(launch > 0 ? launch : 0);
+            const g = 9.81;
+            
+            const time_flight = (2 * v0_mps * Math.sin(theta_rad)) / g;
+            const distance_m = (v0_mps * v0_mps * Math.sin(2 * theta_rad)) / g;
+            const distance_ft = distance_m * 3.28084;
+
+            document.getElementById('val-dist').innerText = distance_ft > 0 ? distance_ft.toFixed(1) : "0.0";
+            document.getElementById('val-time').innerText = time_flight > 0 ? time_flight.toFixed(2) : "0.0";
+        }
+    }
+</script>
 </body>
 </html>
