@@ -1,40 +1,191 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>TechDisc Graph</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TechDisc Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body { background: #000; color: #fff; font-family: monospace; }
-        #canvas-container { width: 100%; height: 400px; }
+        body { font-family: Arial, sans-serif; background-color: #121212; color: #ffffff; margin: 0; padding: 0; }
+        .nav { display: flex; background: #1e1e1e; padding: 10px; border-bottom: 2px solid #333; }
+        .nav button { background: #333; color: #fff; border: none; padding: 10px 20px; margin-right: 10px; cursor: pointer; border-radius: 4px; }
+        .nav button.active { background: #007bff; }
+        .container { padding: 20px; display: none; }
+        .active-tab { display: block; }
+        .card { background: #1e1e1e; padding: 20px; margin-bottom: 15px; border-radius: 8px; border: 1px solid #333; }
+        .metric { font-size: 24px; font-weight: bold; color: #007bff; }
+        #battery-warning { color: #ff4444; font-weight: bold; display: none; margin-left: auto; align-self: center; padding-right: 20px;}
+        #connect-btn { background: #28a745; margin-bottom: 20px; width: 100%; font-size: 18px; padding: 15px; }
+        #canvas-container { width: 100%; height: 60vh; background: #000; border-radius: 8px; overflow: hidden;}
+        #debug-log { width: 100%; height: 200px; background: #000; color: #0f0; font-family: monospace; overflow-y: scroll; padding: 10px; border: 1px solid #333; box-sizing: border-box; }
     </style>
 </head>
 <body>
-    <button onclick="connect()">Connect</button>
-    <div id="canvas-container"><canvas id="chart"></canvas></div>
-    <script>
-        const ctx = document.getElementById('chart').getContext('2d');
-        const chart = new Chart(ctx, {
-            type: 'line',
-            data: { labels: [], datasets: [{label:'AX', data:[], borderColor:'red'}, {label:'AY', data:[], borderColor:'green'}, {label:'AZ', data:[], borderColor:'blue'}]},
-            options: { animation: false, scales: { y: { min: -20, max: 20 } } }
-        });
 
-        async function connect() {
-            const device = await navigator.bluetooth.requestDevice({filters: [{name:'TechDisc-V2'}], optionalServices: ["31303079-7274-656d-656c-655463736944"]});
-            const server = await device.gatt.connect();
-            const service = await server.getPrimaryService("31303079-7274-656d-656c-655463736944");
-            const char = await service.getCharacteristic("32303079-7274-656d-656c-655463736944");
-            char.startNotifications();
-            char.addEventListener('characteristicvaluechanged', (e) => {
-                const v = e.target.value;
-                const ax = v.getFloat32(0, true), ay = v.getFloat32(4, true), az = v.getFloat32(8, true);
-                const time = new Date().toLocaleTimeString();
-                chart.data.labels.push(time);
-                [ax, ay, az].forEach((d, i) => chart.data.datasets[i].data.push(d));
-                if(chart.data.labels.length > 100) { chart.data.labels.shift(); chart.data.datasets.forEach(s => s.data.shift()); }
-                chart.update('none');
+    <div class="nav">
+        <button id="tab-data" class="active" onclick="switchTab('data')">Flight Data</button>
+        <button id="tab-3d" onclick="switchTab('3d')">3D Live View</button>
+        <div id="battery-warning">⚠ LOW BATTERY</div>
+    </div>
+
+    <div style="padding: 20px;">
+        <button id="connect-btn" onclick="connectBluetooth()">Connect to Disc</button>
+    </div>
+
+    <!-- Data Tab -->
+    <div id="data" class="container active-tab">
+        <div class="card">
+            <h3>Release Metrics (Updates on Throw)</h3>
+            <p>Speed: <span id="val-speed" class="metric">0.0</span> mph</p>
+            <p>Spin: <span id="val-spin" class="metric">0.0</span> rpm</p>
+            <p>Wobble: <span id="val-wobble" class="metric">0.0</span> °</p>
+            <p>Hyzer Angle: <span id="val-hyzer" class="metric">0.0</span> °</p>
+            <p>Nose Angle: <span id="val-nose" class="metric">0.0</span> °</p>
+            <p>Launch Angle: <span id="val-launch" class="metric">0.0</span> °</p>
+        </div>
+        <div class="card">
+            <h3>Flight Estimation</h3>
+            <p>Estimated Distance: <span id="val-dist" class="metric">0.0</span> m</p>
+            <p>Flight Duration: <span id="val-time" class="metric">0.0</span> s</p>
+        </div>
+        <div class="card">
+            <h3>Raw Data Stream (Debug)</h3>
+            <div id="debug-log"></div>
+        </div>
+    </div>
+
+    <!-- 3D Tab -->
+    <div id="3d" class="container">
+        <div class="card">
+            <h3>Live Disc Orientation</h3>
+            <div id="canvas-container"></div>
+        </div>
+    </div>
+
+<script>
+    // Tab Logic
+    function switchTab(tabId) {
+        document.querySelectorAll('.container').forEach(c => c.classList.remove('active-tab'));
+        document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active-tab');
+        document.getElementById('tab-' + tabId).classList.add('active');
+    }
+
+    // Three.js Setup
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    container.appendChild(renderer.domElement);
+
+    const geometry = new THREE.CylinderGeometry(5, 5, 0.5, 32);
+    const material = new THREE.MeshBasicMaterial({ color: 0x007bff, wireframe: true });
+    const discMesh = new THREE.Mesh(geometry, material);
+    scene.add(discMesh);
+    camera.position.z = 10;
+    camera.position.y = 5;
+    camera.lookAt(0,0,0);
+
+    function animate() {
+        requestAnimationFrame(animate);
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+
+    // Debug Logging
+    const debugLog = document.getElementById('debug-log');
+    function logDebug(message) {
+        debugLog.innerText += message + '\n';
+        debugLog.scrollTop = debugLog.scrollHeight;
+    }
+
+    // Bluetooth Logic
+    const SERVICE_UUID = "31303079-7274-656d-656c-655463736944";
+    const CHAR_UUID = "32303079-7274-656d-656c-655463736944";
+
+    async function connectBluetooth() {
+        try {
+            logDebug("[SYS] Initiating connection...");
+            const device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: [SERVICE_UUID]
             });
+            
+            logDebug(`[SYS] Device selected: ${device.name}`);
+            const server = await device.gatt.connect();
+            logDebug("[SYS] GATT server connected.");
+            
+            const service = await server.getPrimaryService(SERVICE_UUID);
+            const characteristic = await service.getCharacteristic(CHAR_UUID);
+            logDebug("[SYS] Service and Characteristic resolved.");
+            
+            characteristic.startNotifications();
+            characteristic.addEventListener('characteristicvaluechanged', handleData);
+            logDebug("[SYS] Subscribed to notifications.");
+            
+            document.getElementById('connect-btn').innerText = "Connected";
+            document.getElementById('connect-btn').style.background = "#0056b3";
+        } catch (error) {
+            logDebug(`[ERR] ${error.message}`);
         }
-    </script>
+    }
+
+    function handleData(event) {
+        const value = event.target.value;
+        if (value.byteLength < 26) return;
+
+        // Debug Print Hex
+        const rawBytes = new Uint8Array(value.buffer);
+        const hexString = Array.from(rawBytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
+        logDebug(`[DATA] ${hexString}`);
+
+        // Parse Payload
+        const speed = value.getFloat32(0, true);
+        const spin = value.getFloat32(4, true);
+        const wobble = value.getFloat32(8, true);
+        const hyzer = value.getFloat32(12, true);
+        const nose = value.getFloat32(16, true);
+        const launch = value.getFloat32(20, true);
+        const battery = value.getUint8(24);
+        const state_flag = value.getUint8(25);
+
+        const warnTag = document.getElementById('battery-warning');
+        if (battery < 10) {
+            warnTag.style.display = "block";
+            warnTag.innerText = `⚠ LOW BATTERY (${battery}%)`;
+        } else {
+            warnTag.style.display = "none";
+        }
+
+        discMesh.rotation.z = THREE.MathUtils.degToRad(hyzer);
+        discMesh.rotation.x = THREE.MathUtils.degToRad(nose);
+
+        if (state_flag === 1) {
+            document.getElementById('val-speed').innerText = speed.toFixed(1);
+            document.getElementById('val-spin').innerText = spin.toFixed(0);
+            document.getElementById('val-wobble').innerText = wobble.toFixed(1);
+            document.getElementById('val-hyzer').innerText = hyzer.toFixed(1);
+            document.getElementById('val-nose').innerText = nose.toFixed(1);
+            document.getElementById('val-launch').innerText = launch.toFixed(1);
+
+            const v0_mps = speed * 0.44704; 
+            const theta_rad = THREE.MathUtils.degToRad(launch > 0 ? launch : 0);
+            const g = 9.81;
+            
+            const time_flight = (2 * v0_mps * Math.sin(theta_rad)) / g;
+            const distance_m = (v0_mps * v0_mps * Math.sin(2 * theta_rad)) / g;
+
+            document.getElementById('val-dist').innerText = distance_m > 0 ? distance_m.toFixed(1) : "0.0";
+            document.getElementById('val-time').innerText = time_flight > 0 ? time_flight.toFixed(2) : "0.0";
+        }
+    }
+</script>
 </body>
 </html>
