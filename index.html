@@ -299,9 +299,8 @@
     <div class="topbar">
       <div class="title">
         <h1>Smart Disc Dashboard</h1>
-        <span>BLE telemetry, release metrics, live orientation, and simple flight estimate</span>
+        <span>BLE telemetry, release metrics, live orientation, and flight calculations</span>
       </div>
-
       <button id="connectBtn" class="disconnected">Connect to Disc</button>
     </div>
 
@@ -319,17 +318,14 @@
           <div class="name">Connection</div>
           <div id="summaryConnection" class="data warning">Disconnected</div>
         </div>
-
         <div class="pill">
           <div class="name">Throw state</div>
           <div id="summaryState" class="data">Idle</div>
         </div>
-
         <div class="pill">
           <div class="name">Battery</div>
           <div id="summaryBattery" class="data">--%</div>
         </div>
-
         <div class="pill">
           <div class="name">Last packet</div>
           <div id="summaryPacketTime" class="data muted">Never</div>
@@ -341,37 +337,30 @@
           <label>Speed</label>
           <div><span id="speed" class="value">0.0</span> <span class="unit">mph</span></div>
         </div>
-
         <div class="card metric">
           <label>Spin</label>
           <div><span id="spin" class="value">0</span> <span class="unit">RPM</span></div>
         </div>
-
         <div class="card metric">
           <label>Wobble</label>
           <div><span id="wobble" class="value">0.0</span> <span class="unit">deg</span></div>
         </div>
-
         <div class="card metric">
           <label>Hyzer</label>
           <div><span id="hyzer" class="value">0.0</span> <span class="unit">deg</span></div>
         </div>
-
         <div class="card metric">
           <label>Nose</label>
           <div><span id="nose" class="value">0.0</span> <span class="unit">deg</span></div>
         </div>
-
         <div class="card metric">
           <label>Launch</label>
           <div><span id="launch" class="value">0.0</span> <span class="unit">deg</span></div>
         </div>
-
         <div class="card metric">
           <label>Estimated distance</label>
           <div><span id="distance" class="value">0.0</span> <span class="unit">ft</span></div>
         </div>
-
         <div class="card metric">
           <label>Flight time</label>
           <div><span id="flightTime" class="value">0.00</span> <span class="unit">s</span></div>
@@ -390,7 +379,6 @@
       <div class="grid two">
         <div class="card">
           <h2>Live Values</h2>
-
           <table class="debug-table">
             <thead>
               <tr>
@@ -398,7 +386,6 @@
                 <th>Reading</th>
               </tr>
             </thead>
-
             <tbody>
               <tr><td>Speed</td><td id="debugSpeed">0.0 mph</td></tr>
               <tr><td>Spin</td><td id="debugSpin">0 RPM</td></tr>
@@ -438,21 +425,10 @@
     let telemetryCharacteristic = null;
 
     let latestTelemetry = {
-      speed: 0,
-      spin: 0,
-      wobble: 0,
-      hyzer: 0,
-      nose: 0,
-      launch: 0,
-      battery: 0,
-      state: 0
+      speed: 0, spin: 0, wobble: 0, hyzer: 0, nose: 0, launch: 0, battery: 0, state: 0
     };
 
-    let targetRotation = {
-      x: 0,
-      y: 0,
-      z: 0
-    };
+    let targetRotation = { x: 0, y: 0, z: 0 };
 
     const elements = {
       connectBtn: document.getElementById("connectBtn"),
@@ -460,7 +436,6 @@
       summaryState: document.getElementById("summaryState"),
       summaryBattery: document.getElementById("summaryBattery"),
       summaryPacketTime: document.getElementById("summaryPacketTime"),
-
       speed: document.getElementById("speed"),
       spin: document.getElementById("spin"),
       wobble: document.getElementById("wobble"),
@@ -469,7 +444,6 @@
       launch: document.getElementById("launch"),
       distance: document.getElementById("distance"),
       flightTime: document.getElementById("flightTime"),
-
       debugSpeed: document.getElementById("debugSpeed"),
       debugSpin: document.getElementById("debugSpin"),
       debugGyroX: document.getElementById("debugGyroX"),
@@ -481,18 +455,14 @@
       debugBattery: document.getElementById("debugBattery"),
       debugState: document.getElementById("debugState"),
       debugConnection: document.getElementById("debugConnection"),
-
       log: document.getElementById("log")
     };
 
     function setConnectionStatus(connected, message) {
       const text = connected ? "Connected" : "Disconnected";
-
       elements.summaryConnection.textContent = message || text;
       elements.debugConnection.textContent = message || text;
-
       elements.summaryConnection.className = connected ? "data good" : "data warning";
-
       elements.connectBtn.textContent = connected ? "Connected" : "Connect to Disc";
       elements.connectBtn.className = connected ? "connected" : "disconnected";
     }
@@ -507,11 +477,9 @@
       document.querySelectorAll(".view").forEach(view => {
         view.classList.toggle("active", view.id === viewId);
       });
-
       document.querySelectorAll(".tab").forEach(tab => {
         tab.classList.toggle("active", tab.dataset.view === viewId);
       });
-
       resizeRenderer();
     }
 
@@ -525,27 +493,24 @@
       if (!navigator.bluetooth) {
         elements.connectBtn.className = "error";
         elements.connectBtn.textContent = "Web Bluetooth unavailable";
-        log("Web Bluetooth is not available in this browser. Use Chrome or Edge over HTTPS or localhost.");
+        log("Web Bluetooth requires Chrome/Edge with HTTPS or localhost context.");
         return;
       }
 
       try {
         elements.connectBtn.textContent = "Connecting...";
-        log("Opening Bluetooth device chooser.");
+        log("Requesting Bluetooth peripheral device...");
 
         bluetoothDevice = await navigator.bluetooth.requestDevice({
-          filters: [
-            { namePrefix: "TechDisc" }
-          ],
+          filters: [{ namePrefix: "TechDisc" }],
           optionalServices: [SERVICE_UUID]
         });
 
         bluetoothDevice.addEventListener("gattserverdisconnected", onDisconnected);
-
-        log(`Selected device: ${bluetoothDevice.name || "Unnamed device"}`);
+        log(`Paired with device: ${bluetoothDevice.name}`);
 
         gattServer = await bluetoothDevice.gatt.connect();
-        log("GATT connected.");
+        log("GATT Layer link achieved.");
 
         const service = await gattServer.getPrimaryService(SERVICE_UUID);
         telemetryCharacteristic = await service.getCharacteristic(CHAR_UUID);
@@ -554,25 +519,24 @@
         await telemetryCharacteristic.startNotifications();
 
         setConnectionStatus(true);
-        log("Notifications started.");
+        log("System functional. Operations ready.");
       } catch (error) {
         elements.connectBtn.className = "error";
-        elements.connectBtn.textContent = "Connection failed";
+        elements.connectBtn.textContent = "Link failed";
         setConnectionStatus(false);
-        log(`Connection error: ${error.message}`);
+        log(`Connection failure: ${error.message}`);
       }
     }
 
     function onDisconnected() {
       setConnectionStatus(false);
-      log("Device disconnected.");
+      log("Hardware link closed down safely.");
     }
 
     function parsePacket(dataView) {
       if (dataView.byteLength < 26) {
-        throw new Error(`Packet too small: ${dataView.byteLength}`);
+        throw new Error(`Packet fragment discarded: Size ${dataView.byteLength}`);
       }
-
       return {
         speed: dataView.getFloat32(0, true),
         spin: dataView.getFloat32(4, true),
@@ -588,7 +552,6 @@
     function onTelemetry(event) {
       try {
         latestTelemetry = parsePacket(event.target.value);
-
         updateLiveUi(latestTelemetry);
 
         if (latestTelemetry.state === 2) {
@@ -599,14 +562,14 @@
 
         const bytes = new Uint8Array(event.target.value.buffer);
         const hex = Array.from(bytes).map(byte => byte.toString(16).padStart(2, "0")).join(" ");
-        log(`Packet ${hex}`);
+        log(`Rx Payload: ${hex}`);
       } catch (error) {
-        log(`Packet parse error: ${error.message}`);
+        log(`Payload Exception: ${error.message}`);
       }
     }
 
     function updateLiveUi(t) {
-      const stateName = STATE_NAMES[t.state] || `Unknown ${t.state}`;
+      const stateName = STATE_NAMES[t.state] || `Unknown [${t.state}]`;
       const batteryText = `${t.battery}%`;
 
       elements.summaryState.textContent = stateName;
@@ -618,13 +581,6 @@
       elements.debugSpin.textContent = `${t.spin.toFixed(0)} RPM`;
       elements.debugBattery.textContent = batteryText;
       elements.debugState.textContent = stateName;
-
-      elements.debugGyroX.textContent = "Not streamed";
-      elements.debugGyroY.textContent = "Not streamed";
-      elements.debugGyroZ.textContent = "Not streamed";
-      elements.debugAccelX.textContent = "Not streamed";
-      elements.debugAccelY.textContent = "Not streamed";
-      elements.debugAccelZ.textContent = "Not streamed";
     }
 
     function updateSummaryUi(t) {
@@ -660,7 +616,6 @@
     }
 
     const canvasHost = document.getElementById("orientationCanvas");
-
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x02050a);
 
@@ -691,33 +646,20 @@
 
     const discGeometry = new THREE.CylinderGeometry(3.8, 3.8, 0.35, 72);
     const discMaterial = new THREE.MeshStandardMaterial({
-      color: 0x3aa0ff,
-      metalness: 0.15,
-      roughness: 0.5,
-      transparent: true,
-      opacity: 0.92
+      color: 0x3aa0ff, metalness: 0.15, roughness: 0.5, transparent: true, opacity: 0.92
     });
 
     const disc = new THREE.Mesh(discGeometry, discMaterial);
     discGroup.add(disc);
 
     const rimGeometry = new THREE.TorusGeometry(3.8, 0.08, 12, 96);
-    const rimMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      emissive: 0x0a2038,
-      roughness: 0.4
-    });
-
+    const rimMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
     const rim = new THREE.Mesh(rimGeometry, rimMaterial);
     rim.rotation.x = Math.PI / 2;
     discGroup.add(rim);
 
     const noseGeometry = new THREE.ConeGeometry(0.35, 0.9, 24);
-    const noseMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffd166,
-      emissive: 0x332000
-    });
-
+    const noseMaterial = new THREE.MeshStandardMaterial({ color: 0xffd166 });
     const noseMarker = new THREE.Mesh(noseGeometry, noseMaterial);
     noseMarker.position.set(3.9, 0, 0);
     noseMarker.rotation.z = -Math.PI / 2;
@@ -726,7 +668,6 @@
     function resizeRenderer() {
       const width = canvasHost.clientWidth || 600;
       const height = canvasHost.clientHeight || 420;
-
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
       renderer.setSize(width, height, false);
@@ -749,9 +690,8 @@
     }
 
     animate();
-
     setConnectionStatus(false);
-    log("Dashboard ready.");
+    log("Dashboard initialization complete.");
   </script>
 </body>
 </html>
