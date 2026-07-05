@@ -359,7 +359,7 @@
         </div>
         <div class="card metric">
           <label>Estimated distance</label>
-          <div><span id="distance" class="value">0.0</span> <span class="unit">ft</span></div>
+          <div><span id="distance" class="value">0.0</span> <span class="unit">m</span></div>
         </div>
         <div class="card metric">
           <label>Flight time</label>
@@ -592,7 +592,7 @@
       elements.launch.textContent = t.launch.toFixed(1);
 
       const estimate = estimateFlight(t.speed, t.launch);
-      elements.distance.textContent = estimate.distanceFt.toFixed(1);
+      elements.distance.textContent = estimate.distanceM.toFixed(1);
       elements.flightTime.textContent = estimate.flightTime.toFixed(2);
     }
 
@@ -606,7 +606,7 @@
 
       return {
         flightTime: Number.isFinite(flightTime) && flightTime > 0 ? flightTime : 0,
-        distanceFt: Number.isFinite(distanceM) && distanceM > 0 ? distanceM * 3.28084 : 0
+        distanceM: Number.isFinite(distanceM) && distanceM > 0 ? distanceM : 0
       };
     }
 
