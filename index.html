@@ -3,9 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <title>Smart Disc Dashboard</title>
-
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
   <style>
@@ -426,8 +424,8 @@
   </main>
 
   <script>
-    const SERVICE_UUID = "44697363-5465-6c65-6d65-747279303031";
-    const CHAR_UUID = "44697363-5465-6c65-6d65-747279303032";
+    const SERVICE_UUID = "31303079-7274-656d-656c-655463736944";
+    const CHAR_UUID = "32303079-7274-656d-656c-655463736944";
 
     const STATE_NAMES = {
       0: "Idle",
@@ -657,7 +655,7 @@
     }
 
     function updateOrientationTarget(t) {
-      targetRotation.x = THREE.MathUtils.degToRad(t.nose);
+      targetRotation.x = THREE.MathUtils.degToRad(-t.nose);
       targetRotation.z = THREE.MathUtils.degToRad(t.hyzer);
     }
 
